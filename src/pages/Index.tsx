@@ -35,6 +35,8 @@ const nodeTypes = {
   action: ActionNode,
 };
 
+type ViewMode = 'owner' | 'client';
+
 const Index = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -42,7 +44,7 @@ const Index = () => {
   const [simulationProgress, setSimulationProgress] = useState<string[]>([]);
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [showOptionsModal, setShowOptionsModal] = useState(false);
-  const [viewMode, setViewMode] = useState<'owner' | 'client'>('owner');
+  const [viewMode, setViewMode] = useState<ViewMode>('owner');
   const [isFreelancerCreated, setIsFreelancerCreated] = useState(false);
   const reactFlowWrapper = useRef(null);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
