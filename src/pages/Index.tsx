@@ -1,11 +1,281 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React, { useCallback, useState, useRef, useEffect } from 'react';
+import {
+  ReactFlow,
+  MiniMap,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  Connection,
+  Edge,
+  Node,
+  BackgroundVariant,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import { Play, Square, Save, Download, Upload } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import Sidebar from '@/components/Sidebar';
+import WorkflowNode from '@/components/WorkflowNode';
+import ConditionalNode from '@/components/ConditionalNode';
+import TriggerNode from '@/components/TriggerNode';
+import ActionNode from '@/components/ActionNode';
+import { initialNodes, initialEdges } from '@/data/workflow-data';
+import SimulationOverlay from '@/components/SimulationOverlay';
+
+const nodeTypes = {
+  workflow: WorkflowNode,
+  conditional: ConditionalNode,
+  trigger: TriggerNode,
+  action: ActionNode,
+};
 
 const Index = () => {
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationProgress, setSimulationProgress] = useState<string[]>([]);
+  const reactFlowWrapper = useRef(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState(null);
+
+  const onConnect = useCallback(
+    (params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges]
+  );
+
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const type = event.dataTransfer.getData('application/reactflow');
+      const label = event.dataTransfer.getData('application/reactflow-label');
+      const nodeData = event.dataTransfer.getData('application/reactflow-data');
+
+      if (typeof type === 'undefined' || !type) {
+        return;
+      }
+
+      const position = reactFlowInstance?.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      const newNode: Node = {
+        id: `${type}-${Date.now()}`,
+        type,
+        position: position || { x: 0, y: 0 },
+        data: { 
+          label,
+          ...JSON.parse(nodeData || '{}')
+        },
+      };
+
+      setNodes((nds) => nds.concat(newNode));
+    },
+    [reactFlowInstance, setNodes]
+  );
+
+  const simulateWorkflow = async () => {
+    setIsSimulating(true);
+    setSimulationProgress([]);
+    
+    // Find trigger nodes to start simulation
+    const triggerNodes = nodes.filter(node => node.type === 'trigger');
+    
+    for (const triggerNode of triggerNodes) {
+      await simulateFromNode(triggerNode.id);
+    }
+    
+    setTimeout(() => {
+      setIsSimulating(false);
+      setSimulationProgress([]);
+    }, 1000);
+  };
+
+  const simulateFromNode = async (nodeId: string): Promise<void> => {
+    return new Promise((resolve) => {
+      setSimulationProgress(prev => [...prev, nodeId]);
+      
+      // Highlight current node
+      setNodes(prevNodes => 
+        prevNodes.map(node => ({
+          ...node,
+          data: {
+            ...node.data,
+            isExecuting: node.id === nodeId
+          }
+        }))
+      );
+
+      setTimeout(() => {
+        // Find connected edges and continue simulation
+        const connectedEdges = edges.filter(edge => edge.source === nodeId);
+        
+        setNodes(prevNodes => 
+          prevNodes.map(node => ({
+            ...node,
+            data: {
+              ...node.data,
+              isExecuting: false,
+              isCompleted: node.id === nodeId ? true : node.data.isCompleted
+            }
+          }))
+        );
+
+        // Continue with connected nodes
+        if (connectedEdges.length > 0) {
+          Promise.all(
+            connectedEdges.map(edge => simulateFromNode(edge.target))
+          ).then(() => resolve());
+        } else {
+          resolve();
+        }
+      }, 1500);
+    });
+  };
+
+  const stopSimulation = () => {
+    setIsSimulating(false);
+    setSimulationProgress([]);
+    setNodes(prevNodes => 
+      prevNodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          isExecuting: false,
+          isCompleted: false
+        }
+      }))
+    );
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex">
+      <Sidebar />
+      
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="bg-white/80 backdrop-blur-sm border-b border-purple-100 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              Freelancer Workflow Automation
+            </h1>
+            <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+              Visual Editor
+            </Badge>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="border-purple-200 hover:bg-purple-50"
+            >
+              <Save className="w-4 h-4 mr-1" />
+              Save
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="border-purple-200 hover:bg-purple-50"
+            >
+              <Download className="w-4 h-4 mr-1" />
+              Export
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="border-purple-200 hover:bg-purple-50"
+            >
+              <Upload className="w-4 h-4 mr-1" />
+              Import
+            </Button>
+            {!isSimulating ? (
+              <Button 
+                onClick={simulateWorkflow}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <Play className="w-4 h-4 mr-1" />
+                Run Simulation
+              </Button>
+            ) : (
+              <Button 
+                onClick={stopSimulation}
+                variant="destructive"
+                className="shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <Square className="w-4 h-4 mr-1" />
+                Stop
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Workflow Canvas */}
+        <div className="flex-1 relative" ref={reactFlowWrapper}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onInit={setReactFlowInstance}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            nodeTypes={nodeTypes}
+            fitView
+            className="bg-transparent"
+            connectionLineStyle={{
+              stroke: '#8b5cf6',
+              strokeWidth: 2,
+              strokeDasharray: '5,5',
+            }}
+            defaultEdgeOptions={{
+              animated: true,
+              style: {
+                stroke: '#8b5cf6',
+                strokeWidth: 2,
+              },
+            }}
+          >
+            <Controls 
+              className="!bg-white/80 !backdrop-blur-sm !border-purple-200 !shadow-lg"
+            />
+            <MiniMap 
+              className="!bg-white/80 !backdrop-blur-sm !border-purple-200 !shadow-lg"
+              nodeColor={(node) => {
+                switch (node.type) {
+                  case 'trigger': return '#10b981';
+                  case 'action': return '#3b82f6';
+                  case 'conditional': return '#f59e0b';
+                  default: return '#8b5cf6';
+                }
+              }}
+            />
+            <Background 
+              variant={BackgroundVariant.Dots} 
+              gap={20} 
+              size={1}
+              className="opacity-30"
+              color="#8b5cf6"
+            />
+          </ReactFlow>
+
+          {isSimulating && (
+            <SimulationOverlay 
+              progress={simulationProgress}
+              totalNodes={nodes.length}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
