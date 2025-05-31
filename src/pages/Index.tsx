@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import {
   ReactFlow,
@@ -25,6 +24,9 @@ import TriggerNode from '@/components/TriggerNode';
 import ActionNode from '@/components/ActionNode';
 import { initialNodes, initialEdges } from '@/data/workflow-data';
 import SimulationOverlay from '@/components/SimulationOverlay';
+import BlockOptionsModal from '@/components/BlockOptionsModal';
+import CostTracker from '@/components/CostTracker';
+import ClientView from '@/components/ClientView';
 
 const nodeTypes = {
   workflow: WorkflowNode,
@@ -38,6 +40,10 @@ const Index = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationProgress, setSimulationProgress] = useState<string[]>([]);
+  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [showOptionsModal, setShowOptionsModal] = useState(false);
+  const [viewMode, setViewMode] = useState<'owner' | 'client'>('owner');
+  const [isFreelancerCreated, setIsFreelancerCreated] = useState(false);
   const reactFlowWrapper = useRef(null);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
 
@@ -157,6 +163,32 @@ const Index = () => {
     );
   };
 
+  const onNodeClick = useCallback((event: React.MouseEvent, node: any) => {
+    setSelectedNode(node);
+    setShowOptionsModal(true);
+  }, []);
+
+  const handleSaveNodeOptions = (nodeId: string, options: any) => {
+    setNodes(prevNodes => 
+      prevNodes.map(node => 
+        node.id === nodeId 
+          ? { ...node, data: { ...node.data, options } }
+          : node
+      )
+    );
+  };
+
+  if (viewMode === 'client') {
+    return (
+      <ClientView 
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        isFreelancerCreated={isFreelancerCreated}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex">
       <Sidebar />
@@ -171,9 +203,33 @@ const Index = () => {
             <Badge variant="secondary" className="bg-purple-100 text-purple-700">
               Visual Editor
             </Badge>
+            <div className="flex gap-2">
+              <Button 
+                variant={viewMode === 'owner' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('owner')}
+              >
+                Owner View
+              </Button>
+              <Button 
+                variant={viewMode === 'client' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('client')}
+              >
+                Client Preview
+              </Button>
+            </div>
           </div>
           
           <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setIsFreelancerCreated(!isFreelancerCreated)}
+              className="border-purple-200 hover:bg-purple-50"
+            >
+              {isFreelancerCreated ? 'Freelancer Mode' : 'Client Mode'}
+            </Button>
             <Button 
               variant="outline" 
               size="sm"
@@ -219,63 +275,98 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Workflow Canvas */}
-        <div className="flex-1 relative" ref={reactFlowWrapper}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onInit={setReactFlowInstance}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-            nodeTypes={nodeTypes}
-            fitView
-            className="bg-transparent"
-            connectionLineStyle={{
-              stroke: '#8b5cf6',
-              strokeWidth: 2,
-              strokeDasharray: '5,5',
-            }}
-            defaultEdgeOptions={{
-              animated: true,
-              style: {
+        <div className="flex-1 flex">
+          {/* Workflow Canvas */}
+          <div className="flex-1 relative" ref={reactFlowWrapper}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onInit={setReactFlowInstance}
+              onDrop={onDrop}
+              onDragOver={onDragOver}
+              onNodeClick={onNodeClick}
+              nodeTypes={nodeTypes}
+              fitView
+              className="bg-transparent"
+              connectionLineStyle={{
                 stroke: '#8b5cf6',
                 strokeWidth: 2,
-              },
-            }}
-          >
-            <Controls 
-              className="!bg-white/80 !backdrop-blur-sm !border-purple-200 !shadow-lg"
-            />
-            <MiniMap 
-              className="!bg-white/80 !backdrop-blur-sm !border-purple-200 !shadow-lg"
-              nodeColor={(node) => {
-                switch (node.type) {
-                  case 'trigger': return '#10b981';
-                  case 'action': return '#3b82f6';
-                  case 'conditional': return '#f59e0b';
-                  default: return '#8b5cf6';
-                }
+                strokeDasharray: '5,5',
               }}
-            />
-            <Background 
-              variant={BackgroundVariant.Dots} 
-              gap={20} 
-              size={1}
-              className="opacity-30"
-              color="#8b5cf6"
-            />
-          </ReactFlow>
+              defaultEdgeOptions={{
+                animated: true,
+                style: {
+                  stroke: '#8b5cf6',
+                  strokeWidth: 2,
+                },
+              }}
+            >
+              <Controls 
+                className="!bg-white/80 !backdrop-blur-sm !border-purple-200 !shadow-lg"
+              />
+              <MiniMap 
+                className="!bg-white/80 !backdrop-blur-sm !border-purple-200 !shadow-lg"
+                nodeColor={(node) => {
+                  switch (node.type) {
+                    case 'trigger': return '#10b981';
+                    case 'action': return '#3b82f6';
+                    case 'conditional': return '#f59e0b';
+                    default: return '#8b5cf6';
+                  }
+                }}
+              />
+              <Background 
+                variant={BackgroundVariant.Dots} 
+                gap={20} 
+                size={1}
+                className="opacity-30"
+                color="#8b5cf6"
+              />
+            </ReactFlow>
 
-          {isSimulating && (
-            <SimulationOverlay 
-              progress={simulationProgress}
-              totalNodes={nodes.length}
-            />
-          )}
+            {isSimulating && (
+              <SimulationOverlay 
+                progress={simulationProgress}
+                totalNodes={nodes.length}
+              />
+            )}
+          </div>
+
+          {/* Cost Tracker Sidebar */}
+          <div className="w-80 bg-white/80 backdrop-blur-sm border-l border-purple-100 p-4">
+            <CostTracker nodes={nodes} revisionCost={0} />
+            
+            <div className="mt-6">
+              <h3 className="font-medium text-gray-800 mb-3">Workflow Summary</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total Blocks:</span>
+                  <span>{nodes.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Connections:</span>
+                  <span>{edges.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Mode:</span>
+                  <Badge variant="outline" className="text-xs">
+                    {isFreelancerCreated ? 'Freelancer' : 'Client'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+
+        <BlockOptionsModal
+          isOpen={showOptionsModal}
+          onClose={() => setShowOptionsModal(false)}
+          node={selectedNode}
+          onSave={handleSaveNodeOptions}
+        />
       </div>
     </div>
   );
