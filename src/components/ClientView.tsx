@@ -19,12 +19,19 @@ interface ClientViewProps {
   edges: any[];
   nodeTypes: any;
   isFreelancerCreated?: boolean;
+  shouldApplyFees?: boolean;
 }
 
-const ClientView: React.FC<ClientViewProps> = ({ nodes, edges, nodeTypes, isFreelancerCreated = false }) => {
+const ClientView: React.FC<ClientViewProps> = ({ 
+  nodes, 
+  edges, 
+  nodeTypes, 
+  isFreelancerCreated = false,
+  shouldApplyFees = true
+}) => {
   const [revisions, setRevisions] = useState<string[]>([]);
   const [currentRevision, setCurrentRevision] = useState('');
-  const revisionCost = revisions.length * 25; // $25 per revision
+  const revisionCost = shouldApplyFees ? revisions.length * 25 : 0; // $25 per revision only if fees apply
 
   const handleAddRevision = () => {
     if (currentRevision.trim()) {
@@ -58,7 +65,11 @@ const ClientView: React.FC<ClientViewProps> = ({ nodes, edges, nodeTypes, isFree
           </Badge>
         </div>
 
-        <CostTracker nodes={nodes} revisionCost={revisionCost} />
+        <CostTracker 
+          nodes={nodes} 
+          revisionCost={revisionCost}
+          shouldApplyFees={shouldApplyFees}
+        />
 
         <div className="mt-6">
           <div className="flex items-center gap-2 mb-4">
@@ -80,7 +91,7 @@ const ClientView: React.FC<ClientViewProps> = ({ nodes, edges, nodeTypes, isFree
               className="w-full bg-blue-600 hover:bg-blue-700"
             >
               <Send className="w-4 h-4 mr-2" />
-              Add Revision Request (+$25)
+              Add Revision Request {shouldApplyFees ? '(+$25)' : '(Free)'}
             </Button>
           </div>
 
@@ -92,10 +103,12 @@ const ClientView: React.FC<ClientViewProps> = ({ nodes, edges, nodeTypes, isFree
                   <Card key={index} className="p-3 border-blue-200">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm text-gray-700">{revision}</p>
-                      <Badge variant="outline" className="text-xs">
-                        <DollarSign className="w-3 h-3 mr-1" />
-                        $25
-                      </Badge>
+                      {shouldApplyFees && (
+                        <Badge variant="outline" className="text-xs">
+                          <DollarSign className="w-3 h-3 mr-1" />
+                          $25
+                        </Badge>
+                      )}
                     </div>
                   </Card>
                 ))}

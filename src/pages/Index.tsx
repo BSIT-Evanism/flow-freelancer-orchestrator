@@ -15,6 +15,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { Play, Square, Save, Download, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Sidebar from '@/components/Sidebar';
@@ -36,6 +37,7 @@ const nodeTypes = {
 };
 
 type ViewMode = 'owner' | 'client';
+type WorkflowMode = 'freelancer-to-client' | 'client-managing-freelancers';
 
 const Index = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -45,6 +47,7 @@ const Index = () => {
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [showOptionsModal, setShowOptionsModal] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('owner');
+  const [workflowMode, setWorkflowMode] = useState<WorkflowMode>('freelancer-to-client');
   const [isFreelancerCreated, setIsFreelancerCreated] = useState(false);
   const reactFlowWrapper = useRef(null);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
@@ -180,6 +183,9 @@ const Index = () => {
     );
   };
 
+  // Determine if fees should be applied
+  const shouldApplyFees = workflowMode === 'freelancer-to-client';
+
   if (viewMode === 'client') {
     return (
       <ClientView 
@@ -187,6 +193,7 @@ const Index = () => {
         edges={edges}
         nodeTypes={nodeTypes}
         isFreelancerCreated={isFreelancerCreated}
+        shouldApplyFees={shouldApplyFees}
       />
     );
   }
@@ -224,6 +231,17 @@ const Index = () => {
           </div>
           
           <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white/50">
+              <span className="text-sm text-gray-600">Workflow Mode:</span>
+              <select 
+                value={workflowMode} 
+                onChange={(e) => setWorkflowMode(e.target.value as WorkflowMode)}
+                className="text-sm bg-transparent border-none focus:outline-none"
+              >
+                <option value="freelancer-to-client">Freelancer → Client</option>
+                <option value="client-managing-freelancers">Client Managing Freelancers</option>
+              </select>
+            </div>
             <Button 
               variant="outline" 
               size="sm"
@@ -256,24 +274,20 @@ const Index = () => {
               <Upload className="w-4 h-4 mr-1" />
               Import
             </Button>
-            {!isSimulating ? (
-              <Button 
-                onClick={simulateWorkflow}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                <Play className="w-4 h-4 mr-1" />
-                Run Simulation
-              </Button>
-            ) : (
-              <Button 
-                onClick={stopSimulation}
-                variant="destructive"
-                className="shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                <Square className="w-4 h-4 mr-1" />
-                Stop
-              </Button>
-            )}
+            <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white/50">
+              <span className="text-sm text-gray-600">Simulation:</span>
+              <Switch
+                checked={isSimulating}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    simulateWorkflow();
+                  } else {
+                    stopSimulation();
+                  }
+                }}
+                className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-purple-600 data-[state=checked]:to-blue-600"
+              />
+            </div>
           </div>
         </div>
 
@@ -339,7 +353,12 @@ const Index = () => {
 
           {/* Cost Tracker Sidebar */}
           <div className="w-80 bg-white/80 backdrop-blur-sm border-l border-purple-100 p-4">
-            <CostTracker nodes={nodes} revisionCost={0} />
+            <CostTracker 
+              nodes={nodes} 
+              revisionCost={0} 
+              shouldApplyFees={shouldApplyFees}
+              workflowMode={workflowMode}
+            />
             
             <div className="mt-6">
               <h3 className="font-medium text-gray-800 mb-3">Workflow Summary</h3>
@@ -356,6 +375,12 @@ const Index = () => {
                   <span className="text-gray-600">Mode:</span>
                   <Badge variant="outline" className="text-xs">
                     {isFreelancerCreated ? 'Freelancer' : 'Client'}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Workflow Type:</span>
+                  <Badge variant="outline" className="text-xs">
+                    {workflowMode === 'freelancer-to-client' ? 'F→C' : 'C→F'}
                   </Badge>
                 </div>
               </div>
